@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/Blxssy/url-shortener/internal/config"
+	"github.com/Blxssy/url-shortener/internal/http-server/handlers/redirect"
+	"github.com/Blxssy/url-shortener/internal/http-server/handlers/url/save"
 	mwLogger "github.com/Blxssy/url-shortener/internal/http-server/middleware/logger"
 	"github.com/Blxssy/url-shortener/internal/lib/logger/handlers/slogpretty"
 	"github.com/Blxssy/url-shortener/internal/lib/logger/sl"
@@ -9,6 +11,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"log/slog"
+	"net/http"
 	"os"
 )
 
@@ -40,7 +43,22 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	// TODO: run server
+	router.Post("/url", save.New(log, storage))
+	router.Get("/{alias}", redirect.New(log, storage))
+
+	log.Info("starting server", slog.String("address", cfg.Address))
+
+	srv := &http.Server{
+		Addr:         cfg.Address,
+		Handler:      router,
+		ReadTimeout:  cfg.HTTPServer.Timeout,
+		WriteTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("failed to start server")
+	}
 }
 
 func setupLogger(env string) *slog.Logger {
